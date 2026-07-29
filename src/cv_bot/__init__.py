@@ -1,0 +1,2 @@
+"""Telegram CV builder package."""
+
