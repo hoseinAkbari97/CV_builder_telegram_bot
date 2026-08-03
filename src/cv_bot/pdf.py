@@ -19,17 +19,17 @@ from reportlab.platypus import (
     Table,
     TableStyle,
 )
+from reportlab.platypus import Image as ReportLabImage
 
 from cv_bot.i18n import text
 from cv_bot.models import CV
+from cv_bot.templates import TEMPLATES
 
 INK = colors.HexColor("#172033")
 MUTED = colors.HexColor("#5F6B7A")
 WHITE = colors.white
 TEMPLATE_COLORS = {
-    "modern": colors.HexColor("#2563EB"),
-    "classic": colors.HexColor("#374151"),
-    "minimal": colors.HexColor("#0F766E"),
+    name: colors.HexColor(config["accent"]) for name, config in TEMPLATES.items()
 }
 
 
@@ -99,14 +99,18 @@ def _header(
     name = Paragraph(_display(cv.full_name, cv), styles["name"])
     title = Paragraph(_display(cv.professional_title, cv), styles["title"])
     contact = Paragraph(_contact_line(cv), styles["contact"])
+    photo = _profile_photo(cv)
     if cv.template == "modern":
-        table = Table([[name], [title], [contact]], colWidths=[174 * mm])
+        identity = [name, title, contact]
+        cells = [[photo, identity]] if photo else [["", identity]]
+        table = Table(cells, colWidths=[31 * mm, 143 * mm])
         table.setStyle(
             TableStyle(
                 [
                     ("BACKGROUND", (0, 0), (-1, -1), accent),
-                    ("TOPPADDING", (0, 0), (-1, 0), 10),
-                    ("BOTTOMPADDING", (0, 2), (-1, 2), 10),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 10),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
                     ("LEFTPADDING", (0, 0), (-1, -1), 10),
                     ("RIGHTPADDING", (0, 0), (-1, -1), 10),
                 ]
@@ -114,22 +118,154 @@ def _header(
         )
         return [table, Spacer(1, 5 * mm)]
     if cv.template == "minimal":
+        identity = [name, title, contact]
         table = Table(
-            [["", name], ["", title], ["", contact]],
-            colWidths=[4 * mm, 170 * mm],
+            [["", photo or "", identity]],
+            colWidths=[4 * mm, 29 * mm, 141 * mm],
         )
         table.setStyle(
             TableStyle(
                 [
                     ("BACKGROUND", (0, 0), (0, -1), accent),
                     ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                    ("LEFTPADDING", (1, 0), (1, -1), 9),
-                    ("TOPPADDING", (0, 0), (-1, 0), 5),
-                    ("BOTTOMPADDING", (0, 2), (-1, 2), 5),
+                    ("LEFTPADDING", (1, 0), (-1, -1), 9),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
                 ]
             )
         )
         return [table, Spacer(1, 5 * mm)]
+    if cv.template == "executive":
+        identity = [name, title, Spacer(1, 2 * mm), contact]
+        table = Table(
+            [[photo or "", identity]],
+            colWidths=[35 * mm, 139 * mm],
+        )
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (0, 0), accent),
+                    ("BACKGROUND", (1, 0), (1, 0), colors.HexColor("#F1F5F9")),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 9),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 10),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+                ]
+            )
+        )
+        return [table, Spacer(1, 5 * mm)]
+    if cv.template == "creative":
+        identity = [name, title, contact]
+        table = Table(
+            [[photo or "", identity]],
+            colWidths=[33 * mm, 141 * mm],
+        )
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, -1), accent),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 11),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 11),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 10),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+                ]
+            )
+        )
+        return [table, Spacer(1, 4 * mm)]
+    if cv.template == "elegant":
+        values: list[object] = []
+        if photo:
+            values.extend([photo, Spacer(1, 2 * mm)])
+        values.extend([name, title, Spacer(1, 2 * mm), contact])
+        return [
+            Table([[values]], colWidths=[174 * mm], style=[("ALIGN", (0, 0), (-1, -1), "CENTER")]),
+            Spacer(1, 2 * mm),
+            HRFlowable(width="55%", thickness=1.2, color=accent, hAlign="CENTER"),
+            Spacer(1, 4 * mm),
+        ]
+    if cv.template == "tech":
+        identity = [name, title, contact]
+        table = Table(
+            [["", identity, photo or ""]],
+            colWidths=[5 * mm, 139 * mm, 30 * mm],
+        )
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (0, 0), accent),
+                    ("BACKGROUND", (1, 0), (-1, 0), colors.HexColor("#EEF2FF")),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 9),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+                    ("LEFTPADDING", (1, 0), (-1, -1), 10),
+                ]
+            )
+        )
+        return [table, Spacer(1, 5 * mm)]
+    if cv.template == "compact":
+        identity = [name, title]
+        table = Table(
+            [[identity, contact, photo or ""]],
+            colWidths=[75 * mm, 72 * mm, 27 * mm],
+        )
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, -1), accent),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 7),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                ]
+            )
+        )
+        return [table, Spacer(1, 4 * mm)]
+    if cv.template == "emerald":
+        sidebar: list[object] = []
+        if photo:
+            sidebar.extend([photo, Spacer(1, 3 * mm)])
+        sidebar.append(contact)
+        identity = [name, title]
+        table = Table(
+            [[sidebar, identity]],
+            colWidths=[54 * mm, 120 * mm],
+        )
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), accent),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("TOPPADDING", (0, 0), (-1, -1), 10),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 10),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+                ]
+            )
+        )
+        return [table, Spacer(1, 5 * mm)]
+    if photo:
+        table = Table(
+            [[photo, [name, title, Spacer(1, 2 * mm), contact]]],
+            colWidths=[32 * mm, 142 * mm],
+        )
+        table.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                ]
+            )
+        )
+        return [
+            table,
+            Spacer(1, 3 * mm),
+            HRFlowable(width="100%", thickness=0.8, color=accent),
+            Spacer(1, 4 * mm),
+        ]
     return [
         name,
         title,
@@ -147,7 +283,7 @@ def _skills(
     accent: colors.Color,
 ) -> list[object]:
     cells = [Paragraph(_display(skill, cv), styles["skill"]) for skill in cv.skills]
-    if cv.template == "classic":
+    if cv.template in {"classic", "compact", "elegant"}:
         return [
             _heading(text(cv.language, "skills_label").upper(), styles, cv),
             Paragraph(_display(" • ".join(cv.skills), cv), styles["body"]),
@@ -183,6 +319,15 @@ def _contact_line(cv: CV) -> str:
     values = [cv.email, cv.phone, cv.location, cv.linkedin]
     displayed = [_display(value, cv) for value in values if value]
     return " &nbsp; • &nbsp; ".join(displayed)
+
+
+def _profile_photo(cv: CV) -> ReportLabImage | None:
+    path = Path(cv.photo_path)
+    if not cv.photo_path or not path.is_file():
+        return None
+    photo = ReportLabImage(str(path), width=25 * mm, height=25 * mm, kind="proportional")
+    photo.hAlign = "CENTER"
+    return photo
 
 
 def _heading(title: str, styles: dict[str, ParagraphStyle], cv: CV) -> Paragraph:
@@ -243,8 +388,11 @@ def _styles(
 ) -> dict[str, ParagraphStyle]:
     base = getSampleStyleSheet()
     rtl = cv.language == "fa"
-    header_on_accent = cv.template == "modern"
-    header_alignment = TA_RIGHT if rtl else (TA_LEFT if cv.template == "minimal" else TA_CENTER)
+    header_on_accent = cv.template in {"modern", "creative", "compact", "emerald"}
+    left_aligned = cv.template in {"minimal", "executive", "tech", "compact", "emerald"}
+    header_alignment = TA_RIGHT if rtl else (TA_LEFT if left_aligned else TA_CENTER)
+    section_background = accent if cv.template == "creative" else None
+    section_text = WHITE if section_background else accent
     return {
         "name": ParagraphStyle(
             "CVName",
@@ -280,7 +428,9 @@ def _styles(
             fontName=font_name,
             fontSize=10,
             leading=14,
-            textColor=accent,
+            textColor=section_text,
+            backColor=section_background,
+            borderPadding=(3, 5, 3, 5) if section_background else 0,
             alignment=TA_RIGHT if rtl else TA_LEFT,
             spaceBefore=2,
             spaceAfter=5,

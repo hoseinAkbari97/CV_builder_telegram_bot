@@ -7,6 +7,7 @@ def test_cv_round_trip() -> None:
     cv = CV(
         language="fa",
         template="minimal",
+        photo_path="/tmp/profile.jpg",
         full_name="Ada Lovelace",
         professional_title="Software Engineer",
         email="ada@example.com",
@@ -22,6 +23,7 @@ def test_cv_round_trip() -> None:
     assert cv.is_ready
     assert CV.from_dict({"full_name": "A"}).language == "en"
     assert CV.from_dict({"full_name": "A"}).template == "modern"
+    assert CV.from_dict({"full_name": "A"}).photo_path == ""
 
 
 def test_experience_requires_four_fields() -> None:

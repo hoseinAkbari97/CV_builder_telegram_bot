@@ -1,8 +1,10 @@
+import asyncio
 import logging
 from functools import partial
 from html import escape
 from pathlib import Path
 
+from PIL import Image, ImageOps
 from telegram import BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, Update
 from telegram.constants import ParseMode
 from telegram.ext import (
@@ -25,6 +27,7 @@ from cv_bot.storage import CVStore
 from cv_bot.templates import TEMPLATES, build_template_thumbnail, template_name
 
 (
+    LANGUAGE,
     TEMPLATE,
     FULL_NAME,
     TITLE,
@@ -32,13 +35,14 @@ from cv_bot.templates import TEMPLATES, build_template_thumbnail, template_name
     PHONE,
     LOCATION,
     LINKEDIN,
+    PHOTO,
     SUMMARY,
     SKILLS,
     EXPERIENCE,
     MORE_EXPERIENCE,
     EDUCATION,
     MORE_EDUCATION,
-) = range(13)
+) = range(15)
 
 LOGGER = logging.getLogger(__name__)
 STORE_KEY = "cv_store"
@@ -60,6 +64,7 @@ def run() -> None:
     application.bot_data[ENHANCER_KEY] = CVEnhancer.from_settings(settings)
     application.add_handler(_conversation_handler())
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("language", choose_language))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("templates", show_templates))
     application.add_handler(CommandHandler("preview", preview))
@@ -84,6 +89,9 @@ def _conversation_handler() -> ConversationHandler:
             CallbackQueryHandler(create_cv, pattern="^create_cv$"),
         ],
         states={
+            LANGUAGE: [
+                CallbackQueryHandler(_create_language_choice, pattern=r"^create_language_(en|fa)$")
+            ],
             TEMPLATE: [CallbackQueryHandler(_template_choice, pattern=r"^create_template_")],
             FULL_NAME: [answer_handler(FULL_NAME)],
             TITLE: [answer_handler(TITLE)],
@@ -91,6 +99,10 @@ def _conversation_handler() -> ConversationHandler:
             PHONE: [answer_handler(PHONE)],
             LOCATION: [answer_handler(LOCATION)],
             LINKEDIN: [answer_handler(LINKEDIN)],
+            PHOTO: [
+                MessageHandler(filters.PHOTO, _save_photo),
+                answer_handler(PHOTO),
+            ],
             SUMMARY: [answer_handler(SUMMARY)],
             SKILLS: [answer_handler(SKILLS)],
             EXPERIENCE: [answer_handler(EXPERIENCE)],
@@ -110,6 +122,7 @@ async def _set_commands(application: Application) -> None:
     await application.bot.set_my_commands(
         [
             BotCommand("create", "Create a CV | ساخت رزومه"),
+            BotCommand("language", "Change language | تغییر زبان"),
             BotCommand("templates", "Choose template | انتخاب قالب"),
             BotCommand("preview", "Preview | پیش‌نمایش"),
             BotCommand("pdf", "Download PDF | دریافت PDF"),
@@ -121,11 +134,19 @@ async def _set_commands(application: Application) -> None:
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await choose_language(update, context)
+
+
+async def choose_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await _send_language_choice(update, prefix="language")
+
+
+async def _send_language_choice(update: Update, prefix: str) -> None:
     keyboard = InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("English 🇬🇧", callback_data="language_en"),
-                InlineKeyboardButton("فارسی 🇮🇷", callback_data="language_fa"),
+                InlineKeyboardButton("English 🇬🇧", callback_data=f"{prefix}_en"),
+                InlineKeyboardButton("فارسی 🇮🇷", callback_data=f"{prefix}_fa"),
             ]
         ]
     )
@@ -139,6 +160,7 @@ async def select_language(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await update.callback_query.answer()
     language = update.callback_query.data.removeprefix("language_")
     context.user_data["language"] = language
+    _store(context).save_language(update.effective_user.id, language)
     keyboard = InlineKeyboardMarkup(
         [
             [InlineKeyboardButton(_label(language, "create"), callback_data="create_cv")],
@@ -162,7 +184,27 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def create_cv(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if update.callback_query:
         await update.callback_query.answer()
-    language = _language(update, context)
+    _store(context).discard_draft_photo(update.effective_user.id)
+    selected = context.user_data.get("language")
+    if update.callback_query and selected in {"en", "fa"}:
+        return await _begin_cv(update, context, selected)
+    await _send_language_choice(update, prefix="create_language")
+    return LANGUAGE
+
+
+async def _create_language_choice(
+    update: Update, context: ContextTypes.DEFAULT_TYPE
+) -> int:
+    await update.callback_query.answer()
+    language = update.callback_query.data.removeprefix("create_language_")
+    context.user_data["language"] = language
+    _store(context).save_language(update.effective_user.id, language)
+    return await _begin_cv(update, context, language)
+
+
+async def _begin_cv(
+    update: Update, context: ContextTypes.DEFAULT_TYPE, language: str
+) -> int:
     context.user_data["draft"] = CV(language=language)
     await _send_template_gallery(update, language, prefix="create_template")
     return TEMPLATE
@@ -216,6 +258,12 @@ async def _save_answer(
         return await _ask(update, text(draft.language, "linkedin"), LINKEDIN)
     if state == LINKEDIN:
         draft.linkedin = "" if _is_skip(value) else value
+        return await _ask(update, text(draft.language, "photo"), PHOTO)
+    if state == PHOTO:
+        if not _is_skip(value):
+            await update.effective_message.reply_text(text(draft.language, "photo_required"))
+            return PHOTO
+        draft.photo_path = ""
         return await _ask(update, text(draft.language, "summary"), SUMMARY)
     if state == SUMMARY:
         draft.summary = value
@@ -245,6 +293,24 @@ async def _save_answer(
             return EDUCATION
         return await _ask_more_education(update, draft.language)
     return state
+
+
+async def _save_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    draft = context.user_data.get("draft")
+    if not isinstance(draft, CV):
+        await update.effective_message.reply_text(text(_language(update, context), "expired"))
+        return ConversationHandler.END
+    destination = _store(context).draft_photo_path(update.effective_user.id)
+    telegram_file = await update.effective_message.photo[-1].get_file()
+    temporary_path = destination.with_suffix(".download")
+    await telegram_file.download_to_drive(custom_path=temporary_path)
+    with Image.open(temporary_path) as image:
+        normalized = ImageOps.exif_transpose(image).convert("RGB")
+        normalized.thumbnail((1200, 1200))
+        normalized.save(destination, "JPEG", quality=90, optimize=True)
+    temporary_path.unlink(missing_ok=True)
+    draft.photo_path = str(destination)
+    return await _ask(update, text(draft.language, "summary"), SUMMARY)
 
 
 async def _experience_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -313,6 +379,10 @@ async def _finish_cv(update: Update, context: ContextTypes.DEFAULT_TYPE, draft: 
         return ConversationHandler.END
     await update.effective_message.reply_text(text(draft.language, "enhancing"))
     enhanced = await _enhancer(context).enhance(draft)
+    enhanced.photo_path = _store(context).finalize_photo(
+        update.effective_user.id,
+        has_photo=bool(draft.photo_path),
+    )
     _store(context).save(update.effective_user.id, enhanced)
     context.user_data.pop("draft", None)
     ready_key = "ready_static" if enhanced.content_source == "static" else "ready_ai"
@@ -374,6 +444,12 @@ async def preview(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def _send_preview(update: Update, cv: CV) -> None:
+    photo_path = Path(cv.photo_path)
+    if cv.photo_path and photo_path.is_file():
+        photo_bytes = await asyncio.to_thread(photo_path.read_bytes)
+        await update.effective_message.reply_photo(
+            photo=InputFile(photo_bytes, filename="profile.jpg")
+        )
     experience = "\n".join(
         f"• <b>{escape(item.role)}</b> — {escape(item.company)} ({escape(item.dates)})"
         for item in cv.experiences
@@ -431,6 +507,7 @@ async def delete_cv(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     language = _draft_language(context)
+    _store(context).discard_draft_photo(update.effective_user.id)
     context.user_data.pop("draft", None)
     await update.effective_message.reply_text(text(language, "cancelled"))
     return ConversationHandler.END
@@ -453,6 +530,10 @@ def _language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> str:
     selected = context.user_data.get("language")
     if selected in {"en", "fa"}:
         return selected
+    preferred = _store(context).load_language(update.effective_user.id)
+    if preferred:
+        context.user_data["language"] = preferred
+        return preferred
     saved = _store(context).load(update.effective_user.id)
     if saved.is_ready and saved.language in {"en", "fa"}:
         return saved.language

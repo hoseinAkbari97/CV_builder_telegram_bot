@@ -7,9 +7,11 @@ polishes the content with free-tier LLM providers, and generates a selected A4 P
 
 - Guided, mobile-friendly CV creation
 - English and Persian user flows and PDF output
+- Explicit, persistent bot-language selection
 - Hybrid AI fallback: Groq models → OpenRouter free models → Cloudflare Workers AI
 - Automatic static fallback when no AI provider succeeds
-- Modern, Classic, and Minimal templates with Telegram image previews
+- Nine professional templates with Telegram image previews
+- Optional profile-photo upload and PDF placement
 - Professional profile, skills, experience, and education sections
 - Persistent per-user drafts stored as JSON
 - One-tap PDF download
@@ -59,6 +61,7 @@ polishes the content with free-tier LLM providers, and generates a selected A4 P
 ## Bot commands
 
 - `/create` — create or replace a CV
+- `/language` — change the bot language
 - `/templates` — preview and select a PDF template
 - `/preview` — preview the saved CV
 - `/pdf` — generate and download the PDF

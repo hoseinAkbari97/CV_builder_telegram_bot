@@ -6,6 +6,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "is unavailable, your original answers are used automatically."
         ),
         "choose_language": "Choose your language:",
+        "language_saved": "Language changed to English.",
         "choose_template": "Choose a resume template:",
         "template_saved": "Template updated to <b>{template}</b>.",
         "full_name": "<b>Let’s build your CV.</b>\n\nWhat is your full name?",
@@ -15,13 +16,19 @@ TEXTS: dict[str, dict[str, str]] = {
         "phone": "What is your phone number? Type <b>skip</b> to omit it.",
         "location": "Where are you located? Example: Berlin, Germany",
         "linkedin": "Send your LinkedIn URL, or type <b>skip</b>.",
+        "photo": (
+            "Send a clear profile photo for your CV, or type <b>skip</b> to continue "
+            "without one."
+        ),
+        "photo_required": "Please send a photo, or type <b>skip</b>.",
         "summary": (
             "Describe your background, specialty, and value in your own words. "
             "AI will turn it into a concise professional summary."
         ),
         "skills": (
-            "List 5–10 key skills separated by commas.\n"
-            "Example: Python, Project Management, Data Analysis"
+            "List your known skills separated by commas. You may also ask AI to suggest "
+            "additional relevant skills based only on the experience and background you provide.\n"
+            "Example: Python, Data Analysis, suggest other relevant skills"
         ),
         "skills_required": "Please enter at least one skill.",
         "experience": (
@@ -65,6 +72,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "help": (
             "<b>Commands</b>\n"
             "/create — create a new CV\n"
+            "/language — change bot language\n"
             "/templates — view or change templates\n"
             "/preview — review saved content\n"
             "/pdf — download the PDF\n"
@@ -79,6 +87,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "هوش مصنوعی در دسترس نباشند، پاسخ‌های اصلی شما به‌صورت خودکار استفاده می‌شوند."
         ),
         "choose_language": "زبان خود را انتخاب کنید:",
+        "language_saved": "زبان به فارسی تغییر کرد.",
         "choose_template": "قالب رزومه را انتخاب کنید:",
         "template_saved": "قالب به <b>{template}</b> تغییر کرد.",
         "full_name": "<b>رزومه شما را بسازیم.</b>\n\nنام و نام خانوادگی شما چیست؟",
@@ -88,13 +97,19 @@ TEXTS: dict[str, dict[str, str]] = {
         "phone": "شماره تماس شما چیست؟ برای حذف این بخش <b>رد</b> را بنویسید.",
         "location": "محل سکونت شما کجاست؟ مثال: تهران، ایران",
         "linkedin": "لینک پروفایل لینکدین را بفرستید یا <b>رد</b> را بنویسید.",
+        "photo": (
+            "یک عکس پرسنلی واضح برای رزومه بفرستید یا برای ادامه بدون عکس "
+            "<b>رد</b> را بنویسید."
+        ),
+        "photo_required": "لطفاً یک عکس بفرستید یا <b>رد</b> را بنویسید.",
         "summary": (
             "سابقه، تخصص و ارزشی که ایجاد می‌کنید را با زبان خودتان توضیح دهید. "
             "هوش مصنوعی آن را به یک خلاصه حرفه‌ای تبدیل می‌کند."
         ),
         "skills": (
-            "۵ تا ۱۰ مهارت کلیدی را با ویرگول جدا کنید.\n"
-            "مثال: پایتون، مدیریت پروژه، تحلیل داده"
+            "مهارت‌هایی را که دارید با ویرگول جدا کنید. همچنین می‌توانید از هوش مصنوعی "
+            "بخواهید بر اساس سوابقی که وارد می‌کنید مهارت‌های مرتبط دیگری پیشنهاد دهد.\n"
+            "مثال: پایتون، تحلیل داده، مهارت‌های مرتبط دیگر را پیشنهاد بده"
         ),
         "skills_required": "لطفاً حداقل یک مهارت وارد کنید.",
         "experience": (
@@ -138,6 +153,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "help": (
             "<b>دستورها</b>\n"
             "/create — ساخت رزومه جدید\n"
+            "/language — تغییر زبان ربات\n"
             "/templates — مشاهده یا تغییر قالب\n"
             "/preview — مشاهده محتوای ذخیره‌شده\n"
             "/pdf — دریافت فایل PDF\n"

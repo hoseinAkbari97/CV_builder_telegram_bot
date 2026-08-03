@@ -39,6 +39,7 @@ class CV:
     language: str = "en"
     template: str = "modern"
     content_source: str = "static"
+    photo_path: str = ""
     full_name: str = ""
     professional_title: str = ""
     email: str = ""
@@ -59,6 +60,7 @@ class CV:
             language=str(value.get("language", "en")),
             template=str(value.get("template", "modern")),
             content_source=str(value.get("content_source", "static")),
+            photo_path=str(value.get("photo_path", "")),
             full_name=str(value.get("full_name", "")),
             professional_title=str(value.get("professional_title", "")),
             email=str(value.get("email", "")),

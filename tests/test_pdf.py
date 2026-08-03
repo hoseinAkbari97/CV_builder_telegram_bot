@@ -1,5 +1,8 @@
+from PIL import Image
+
 from cv_bot.models import CV, Education, Experience
 from cv_bot.pdf import build_cv_pdf
+from cv_bot.templates import TEMPLATES
 
 
 def test_build_cv_pdf(tmp_path) -> None:
@@ -35,10 +38,13 @@ def test_build_cv_pdf(tmp_path) -> None:
 
 
 def test_build_persian_pdf_for_each_template(tmp_path) -> None:
-    for template in ("modern", "classic", "minimal"):
+    photo_path = tmp_path / "profile.jpg"
+    Image.new("RGB", (300, 400), "#CBD5E1").save(photo_path)
+    for template in TEMPLATES:
         cv = CV(
             language="fa",
             template=template,
+            photo_path=str(photo_path),
             full_name="سارا احمدی",
             professional_title="مهندس نرم‌افزار",
             email="sara@example.com",

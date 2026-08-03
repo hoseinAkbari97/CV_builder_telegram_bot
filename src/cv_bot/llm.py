@@ -120,39 +120,52 @@ class CVEnhancer:
         response.raise_for_status()
         content = response.json()["choices"][0]["message"]["content"]
         value = json.loads(_extract_json(content))
-        enhanced = CV.from_dict(value)
-        _validate_facts(enhanced, original=original)
+        enhanced = _apply_enhancement(value, original)
         return enhanced
 
 
 def _prompt(cv: CV) -> str:
     language = "Persian" if cv.language == "fa" else "English"
     schema = {
-        "full_name": "string",
-        "professional_title": "string",
-        "email": "string",
-        "phone": "string",
-        "location": "string",
-        "linkedin": "string",
         "summary": "string",
         "skills": ["string"],
+        "experience_descriptions": ["string"],
+    }
+    explicit_skills, skill_requests = _partition_skills(cv.skills)
+    cv_context = {
+        "professional_title": cv.professional_title,
+        "summary": cv.summary,
+        "skills": explicit_skills,
         "experiences": [
             {
-                "company": "string",
-                "role": "string",
-                "dates": "string",
-                "description": "string",
+                "company": experience.company,
+                "role": experience.role,
+                "dates": experience.dates,
+                "description": experience.description,
             }
+            for experience in cv.experiences
         ],
-        "education": [{"institution": "string", "degree": "string", "dates": "string"}],
+        "education": [
+            {
+                "institution": education.institution,
+                "degree": education.degree,
+                "dates": education.dates,
+            }
+            for education in cv.education
+        ],
     }
     return (
-        f"Rewrite this CV in professional, concise {language}. Improve the summary and "
-        "experience descriptions with strong action verbs and ATS-friendly phrasing. "
-        "Never invent employers, dates, degrees, metrics, technologies, or achievements. "
-        "Keep names, contact details, institutions, roles, dates, and list lengths unchanged. "
+        f"Edit this CV in professional, concise {language}. Return only editable content. "
+        "Improve the summary and experience descriptions with strong action verbs and "
+        "ATS-friendly phrasing. Never invent employers, dates, degrees, metrics, technologies, "
+        "achievements, or qualifications. Keep every explicit skill. Add skills only when they "
+        "are directly supported by the title, summary, or experience. Skill requests are "
+        "instructions and must never appear as skills. Return one experience description for "
+        "each input experience, in the same order. "
         f"Return exactly this JSON shape: {json.dumps(schema)}\n"
-        f"CV data: {json.dumps(cv.to_dict(), ensure_ascii=False)}"
+        f"Explicit skills: {json.dumps(explicit_skills, ensure_ascii=False)}\n"
+        f"Skill requests: {json.dumps(skill_requests, ensure_ascii=False)}\n"
+        f"CV data: {json.dumps(cv_context, ensure_ascii=False)}"
     )
 
 
@@ -164,30 +177,75 @@ def _extract_json(content: str) -> str:
     return content[start : end + 1]
 
 
-def _validate_facts(enhanced: CV, original: CV) -> None:
-    protected = (
-        "full_name",
-        "email",
-        "phone",
-        "location",
-        "linkedin",
-        "professional_title",
-    )
-    if any(getattr(enhanced, field) != getattr(original, field) for field in protected):
-        raise ValueError("The model changed protected personal facts")
-    if len(enhanced.experiences) != len(original.experiences):
+def _apply_enhancement(value: object, original: CV) -> CV:
+    if not isinstance(value, dict):
+        raise TypeError("The model response must be a JSON object")
+    summary = str(value.get("summary", "")).strip()
+    descriptions = value.get("experience_descriptions", [])
+    generated_skills = value.get("skills", [])
+    if not summary:
+        raise ValueError("The model returned an empty summary")
+    if not isinstance(descriptions, list) or len(descriptions) != len(original.experiences):
         raise ValueError("The model changed the experience count")
-    if len(enhanced.education) != len(original.education):
-        raise ValueError("The model changed the education count")
-    if enhanced.skills != original.skills:
-        raise ValueError("The model changed protected skills")
-    for new, old in zip(enhanced.experiences, original.experiences, strict=True):
-        if (new.company, new.role, new.dates) != (old.company, old.role, old.dates):
-            raise ValueError("The model changed protected experience facts")
-    for new, old in zip(enhanced.education, original.education, strict=True):
-        if (new.institution, new.degree, new.dates) != (
-            old.institution,
-            old.degree,
-            old.dates,
-        ):
-            raise ValueError("The model changed protected education facts")
+    if not isinstance(generated_skills, list):
+        raise TypeError("The model returned invalid skills")
+
+    enhanced = CV.from_dict(original.to_dict())
+    enhanced.summary = summary
+    enhanced.skills = _merge_skills(original.skills, generated_skills)
+    for experience, description in zip(
+        enhanced.experiences,
+        descriptions,
+        strict=True,
+    ):
+        polished = str(description).strip()
+        if not polished:
+            raise ValueError("The model returned an empty experience description")
+        experience.description = polished
+    return enhanced
+
+
+def _merge_skills(original: list[str], generated: list[object]) -> list[str]:
+    explicit, _ = _partition_skills(original)
+    merged: list[str] = []
+    seen: set[str] = set()
+    for skill in [*explicit, *(str(item).strip() for item in generated)]:
+        normalized = skill.casefold()
+        if not skill or _is_skill_instruction(skill) or normalized in seen:
+            continue
+        seen.add(normalized)
+        merged.append(skill)
+    if not merged:
+        raise ValueError("The model did not return factual skills")
+    return merged[:12]
+
+
+def _partition_skills(skills: list[str]) -> tuple[list[str], list[str]]:
+    explicit: list[str] = []
+    requests: list[str] = []
+    for skill in skills:
+        (requests if _is_skill_instruction(skill) else explicit).append(skill)
+    return explicit, requests
+
+
+def _is_skill_instruction(value: str) -> bool:
+    normalized = " ".join(value.casefold().split())
+    phrases = (
+        "use ai",
+        "use artificial intelligence",
+        "fill other",
+        "fill the rest",
+        "add other",
+        "add more",
+        "suggest other",
+        "suggest more",
+        "complete this",
+        "هوش مصنوعی",
+        "پیشنهاد بده",
+        "پیشنهاد دهید",
+        "اضافه کن",
+        "اضافه کنید",
+        "کامل کن",
+        "بقیه",
+    )
+    return any(phrase in normalized for phrase in phrases)
