@@ -33,3 +33,19 @@ def test_build_cv_pdf(tmp_path) -> None:
     assert output.read_bytes().startswith(b"%PDF")
     assert output.stat().st_size > 1_000
 
+
+def test_build_persian_pdf_for_each_template(tmp_path) -> None:
+    for template in ("modern", "classic", "minimal"):
+        cv = CV(
+            language="fa",
+            template=template,
+            full_name="سارا احمدی",
+            professional_title="مهندس نرم‌افزار",
+            email="sara@example.com",
+            location="تهران، ایران",
+            summary="توسعه‌دهنده نرم‌افزار با تمرکز بر سامانه‌های قابل اعتماد.",
+            skills=["پایتون", "طراحی سامانه", "تحلیل داده"],
+        )
+        output = build_cv_pdf(cv, tmp_path / f"{template}.pdf")
+
+        assert output.read_bytes().startswith(b"%PDF")

@@ -36,6 +36,9 @@ class Education:
 
 @dataclass(slots=True)
 class CV:
+    language: str = "en"
+    template: str = "modern"
+    content_source: str = "static"
     full_name: str = ""
     professional_title: str = ""
     email: str = ""
@@ -53,6 +56,9 @@ class CV:
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> "CV":
         return cls(
+            language=str(value.get("language", "en")),
+            template=str(value.get("template", "modern")),
+            content_source=str(value.get("content_source", "static")),
             full_name=str(value.get("full_name", "")),
             professional_title=str(value.get("professional_title", "")),
             email=str(value.get("email", "")),
@@ -84,4 +90,3 @@ def parse_education(value: str) -> Education:
     if len(parts) != 3 or not all(parts):
         raise ValueError("Use: Institution | Degree | Dates")
     return Education(institution=parts[0], degree=parts[1], dates=parts[2])
-

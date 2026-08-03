@@ -5,6 +5,8 @@ from cv_bot.models import CV, parse_education, parse_experience
 
 def test_cv_round_trip() -> None:
     cv = CV(
+        language="fa",
+        template="minimal",
         full_name="Ada Lovelace",
         professional_title="Software Engineer",
         email="ada@example.com",
@@ -18,6 +20,8 @@ def test_cv_round_trip() -> None:
 
     assert CV.from_dict(cv.to_dict()) == cv
     assert cv.is_ready
+    assert CV.from_dict({"full_name": "A"}).language == "en"
+    assert CV.from_dict({"full_name": "A"}).template == "modern"
 
 
 def test_experience_requires_four_fields() -> None:
@@ -28,4 +32,3 @@ def test_experience_requires_four_fields() -> None:
 def test_education_requires_three_fields() -> None:
     with pytest.raises(ValueError, match="Institution"):
         parse_education("University | Degree")
-

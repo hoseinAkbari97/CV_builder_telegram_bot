@@ -1,11 +1,15 @@
 # Telegram CV Builder
 
-A Telegram bot that guides users through a short CV questionnaire, saves their progress,
-shows a preview, and generates a polished A4 PDF.
+A bilingual Telegram bot that guides users through a CV questionnaire, optionally
+polishes the content with free-tier LLM providers, and generates a selected A4 PDF design.
 
 ## Features
 
 - Guided, mobile-friendly CV creation
+- English and Persian user flows and PDF output
+- Hybrid AI fallback: Groq models → OpenRouter free models → Cloudflare Workers AI
+- Automatic static fallback when no AI provider succeeds
+- Modern, Classic, and Minimal templates with Telegram image previews
 - Professional profile, skills, experience, and education sections
 - Persistent per-user drafts stored as JSON
 - One-tap PDF download
@@ -34,7 +38,17 @@ shows a preview, and generates a polished A4 PDF.
    cp .env.example .env
    ```
 
-   Add the BotFather token to `TELEGRAM_BOT_TOKEN` in `.env`.
+   Add the BotFather token to `TELEGRAM_BOT_TOKEN` in `.env`. Then configure one or
+   more optional AI providers:
+
+   - `GROQ_API_KEY`: tries every entry in `GROQ_MODELS` in order.
+   - `OPENROUTER_API_KEY`: uses `openrouter/free` by default, or a comma-separated
+     list of specific free model IDs.
+   - `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`: tries every entry in
+     `CLOUDFLARE_MODELS`.
+
+   Provider and model failures are isolated. The bot continues through the chain and
+   saves the user's original content if every request fails.
 
 5. Start polling:
 
@@ -45,6 +59,7 @@ shows a preview, and generates a polished A4 PDF.
 ## Bot commands
 
 - `/create` — create or replace a CV
+- `/templates` — preview and select a PDF template
 - `/preview` — preview the saved CV
 - `/pdf` — generate and download the PDF
 - `/delete` — delete saved user data
@@ -57,10 +72,12 @@ User CV data is stored under `CV_BOT_DATA_DIR` (`./data` by default). The direct
 excluded from Git. For production, mount it on persistent encrypted storage and restrict
 filesystem access to the bot process.
 
+The bot sends CV content to any configured AI provider. Update your privacy policy and
+obtain user consent before using third-party APIs in production. API keys remain server-side.
+
 ## Test
 
 ```bash
 pytest
 ruff check .
 ```
-
